@@ -1,0 +1,18 @@
+# Environment variables
+.env
+*.env
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Editor
+.vscode/
+.idea/
+.kiro/
+
+# OS
+.DS_Store
+Thumbs.db
