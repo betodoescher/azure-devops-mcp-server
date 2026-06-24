@@ -293,13 +293,72 @@ export function registerTools(server: McpServer): void {
     "Get full details of a specific test result including error message and stack trace.",
     {
       project: z.string().describe("Project name or ID"),
-      runId: z.number().describe("Test run ID"),
-      resultId: z.number().describe("Test result ID"),
+      runId: z.number().int().positive().describe("Test run ID"),
+      resultId: z.number().int().positive().describe("Test result ID"),
     },
     async ({ project, runId, resultId }) => {
       try {
         const res = await azureClient.get<TestResult>(
           `/${enc(project)}/_apis/test/runs/${runId}/results/${resultId}`
+        );
+        return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
+      } catch (err) {
+        return errorResponse(err);
+      }
+    }
+  );
+
+  // ── Create Test Suite ─────────────────────────────────────────────────
+
+  server.tool(
+    "create_test_suite",
+    "Create a new static test suite under a parent suite in a test plan.",
+    {
+      project: z.string().describe("Project name or ID"),
+      planId: z.number().int().positive().describe("Test plan ID"),
+      parentSuiteId: z.number().int().positive().describe("Parent suite ID under which the new suite will be created"),
+      name: z.string().min(1).describe("Name of the new test suite"),
+    },
+    async ({ project, planId, parentSuiteId, name }) => {
+      try {
+        // Test Plan Suite endpoints require api-version 7.1-preview.1 (preview API)
+        const res = await azureClient.post(
+          `/${enc(project)}/_apis/testplan/plans/${planId}/suites`,
+          {
+            suiteType: "staticTestSuite",
+            name,
+            parentSuite: { id: parentSuiteId },
+          },
+          { params: { "api-version": "7.1-preview.1" } }
+        );
+        return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
+      } catch (err) {
+        return errorResponse(err);
+      }
+    }
+  );
+
+  // ── Add Test Cases to Suite ───────────────────────────────────────────
+
+  server.tool(
+    "add_test_cases_to_suite",
+    "Add existing test cases (work items) to a test suite.",
+    {
+      project: z.string().describe("Project name or ID"),
+      planId: z.number().int().positive().describe("Test plan ID"),
+      suiteId: z.number().int().positive().describe("Target test suite ID"),
+      testCaseIds: z.array(z.number().int().positive()).min(1).describe("Array of test case work item IDs to add (at least one required)"),
+    },
+    async ({ project, planId, suiteId, testCaseIds }) => {
+      try {
+        const body = testCaseIds.map((id) => ({
+          workItem: { id },
+        }));
+        // Test Plan Suite TestCase endpoint requires api-version 7.1-preview.1 (preview API)
+        const res = await azureClient.post(
+          `/${enc(project)}/_apis/testplan/plans/${planId}/suites/${suiteId}/testcase`,
+          body,
+          { params: { "api-version": "7.1-preview.1" } }
         );
         return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
       } catch (err) {
