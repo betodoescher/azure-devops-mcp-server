@@ -351,14 +351,12 @@ export function registerTools(server: McpServer): void {
     },
     async ({ project, planId, suiteId, testCaseIds }) => {
       try {
-        const body = testCaseIds.map((id) => ({
-          workItem: { id },
-        }));
-        // Test Plan Suite TestCase endpoint requires api-version 7.1-preview.1 (preview API)
+        // Use the legacy test API (/_apis/test/) which accepts IDs in the URL path
+        const ids = testCaseIds.join(",");
         const res = await azureClient.post(
-          `/${enc(project)}/_apis/testplan/plans/${planId}/suites/${suiteId}/testcase`,
-          body,
-          { params: { "api-version": "7.1-preview.1" } }
+          `/${enc(project)}/_apis/test/Plans/${planId}/suites/${suiteId}/testcases/${ids}`,
+          undefined,
+          { params: { "api-version": "7.0" } }
         );
         return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
       } catch (err) {
