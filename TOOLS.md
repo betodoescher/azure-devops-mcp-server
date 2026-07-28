@@ -113,3 +113,20 @@
 | `get_items_without_estimation` | Work items with no story points and no effort value |
 | `get_prs_without_required_review` | Merged PRs that lacked the required number of approvals |
 | `get_items_without_acceptance_criteria` | User Stories with empty acceptance criteria field |
+
+## Test Plans
+| Tool | Description |
+|------|-------------|
+| `list_test_plans` | List all test plans in a project |
+| `get_test_plan` | Get full details of a specific test plan |
+| `list_test_suites` | List all test suites in a test plan |
+| `get_test_suite` | Get details of a specific test suite |
+| `create_test_suite` | Create a static test suite under a parent suite |
+| `add_test_cases_to_suite` | Add existing test cases to a suite |
+| `list_test_cases` | List test cases in a suite |
+| `list_test_points` | List test points (test case + config + tester) in a suite |
+| `reset_test_points` | Reset test points to active state (clear execution outcome). Resets specific points or all in the suite. |
+| `list_test_runs` | List test runs in a project (optional plan filter) |
+| `get_test_run` | Get details of a specific test run |
+| `list_test_results` | List test results for a run (optional outcome filter) |
+| `get_test_result` | Get full test result details including error message and stack trace |

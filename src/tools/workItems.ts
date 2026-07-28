@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { azureClient } from "../azureClient.js";
+import { config } from "../config.js";
 import type { WorkItem, WorkItemRevision, WorkItemComment, WiqlQueryResult, ApiListResponse } from "../types/azure.js";
 
 // ---------------------------------------------------------------------------
@@ -19,7 +20,7 @@ export function registerTools(server: McpServer): void {
   server.tool(
     "create_work_item",
     "Create a new work item (Bug, Task, User Story, etc.) in an Azure DevOps project. " +
-      "Returns the created work item id, url and all fields.",
+    "Returns the created work item id, url and all fields.",
     {
       project: z.string().describe("Project name or id"),
       type: z
@@ -29,12 +30,13 @@ export function registerTools(server: McpServer): void {
       description: z.string().optional().describe("HTML description"),
       assignee: z.string().optional().describe("Assignee email or display name"),
       priority: z.number().int().min(1).max(4).optional().describe("Priority (1–4)"),
+      activity: z.string().optional().describe('Activity type for Tasks, e.g. "Development", "Testing", "Requirements", "Design", "Deployment", "Documentation"'),
       tags: z.string().optional().describe("Semicolon-separated tags"),
       areaPath: z.string().optional().describe("Area path"),
       iterationPath: z.string().optional().describe("Iteration / sprint path"),
       parentId: z.number().int().positive().optional().describe("Parent work item id"),
     },
-    async ({ project, type, title, description, assignee, priority, tags, areaPath, iterationPath, parentId }) => {
+    async ({ project, type, title, description, assignee, priority, activity, tags, areaPath, iterationPath, parentId }) => {
       try {
         const patches: JsonPatchOperation[] = [
           { op: "add", path: "/fields/System.Title", value: title },
@@ -48,6 +50,9 @@ export function registerTools(server: McpServer): void {
         }
         if (priority !== undefined) {
           patches.push({ op: "add", path: "/fields/Microsoft.VSTS.Common.Priority", value: priority });
+        }
+        if (activity !== undefined) {
+          patches.push({ op: "add", path: "/fields/Microsoft.VSTS.Common.Activity", value: activity });
         }
         if (tags !== undefined) {
           patches.push({ op: "add", path: "/fields/System.Tags", value: tags });
@@ -64,7 +69,7 @@ export function registerTools(server: McpServer): void {
             path: "/relations/-",
             value: {
               rel: "System.LinkTypes.Hierarchy-Reverse",
-              url: `/_apis/wit/workitems/${parentId}`,
+              url: `${config.AZURE_DEVOPS_ORG}/_apis/wit/workitems/${parentId}`,
             },
           });
         }
@@ -138,7 +143,7 @@ export function registerTools(server: McpServer): void {
   server.tool(
     "update_work_item",
     "Apply one or more JSON Patch operations to a work item and return the updated item. " +
-      'Example patch: [{ "op": "replace", "path": "/fields/System.State", "value": "Active" }]',
+    'Example patch: [{ "op": "replace", "path": "/fields/System.State", "value": "Active" }]',
     {
       id: z.number().int().positive().describe("Work item id"),
       patches: z
@@ -397,7 +402,7 @@ export function registerTools(server: McpServer): void {
             path: "/relations/-",
             value: {
               rel: relationType,
-              url: `/_apis/wit/workitems/${targetId}`,
+              url: `${config.AZURE_DEVOPS_ORG}/_apis/wit/workitems/${targetId}`,
             },
           },
         ];
@@ -437,7 +442,7 @@ export function registerTools(server: McpServer): void {
   server.tool(
     "bulk_create_work_items",
     "Create multiple work items in a single call. Iterates over each item definition sequentially " +
-      "and returns a result list with success status, id and url per item, or an error message if creation failed.",
+    "and returns a result list with success status, id and url per item, or an error message if creation failed.",
     {
       project: z.string().describe("Project name or id"),
       items: z
@@ -448,6 +453,7 @@ export function registerTools(server: McpServer): void {
             description: z.string().optional().describe("HTML description"),
             assignee: z.string().optional().describe("Assignee email or display name"),
             priority: z.number().int().min(1).max(4).optional().describe("Priority (1–4)"),
+            activity: z.string().optional().describe('Activity type for Tasks, e.g. "Development", "Testing", "Requirements", "Design", "Deployment", "Documentation"'),
             tags: z.string().optional().describe("Semicolon-separated tags"),
             areaPath: z.string().optional().describe("Area path"),
             iterationPath: z.string().optional().describe("Iteration / sprint path"),
@@ -484,6 +490,9 @@ export function registerTools(server: McpServer): void {
           if (item.priority !== undefined) {
             patches.push({ op: "add", path: "/fields/Microsoft.VSTS.Common.Priority", value: item.priority });
           }
+          if (item.activity !== undefined) {
+            patches.push({ op: "add", path: "/fields/Microsoft.VSTS.Common.Activity", value: item.activity });
+          }
           if (item.tags !== undefined) {
             patches.push({ op: "add", path: "/fields/System.Tags", value: item.tags });
           }
@@ -499,13 +508,13 @@ export function registerTools(server: McpServer): void {
               path: "/relations/-",
               value: {
                 rel: "System.LinkTypes.Hierarchy-Reverse",
-                url: `/_apis/wit/workitems/${item.parentId}`,
+                url: `${config.AZURE_DEVOPS_ORG}/_apis/wit/workitems/${item.parentId}`,
               },
             });
           }
 
           const response = await azureClient.post<WorkItem>(
-            `/${encodeURIComponent(project)}/_apis/wit/workitems/${encodeURIComponent(item.type)}`,
+            `/${encodeURIComponent(project)}/_apis/wit/workitems/$${encodeURIComponent(item.type)}`,
             patches,
             { headers: { "Content-Type": "application/json-patch+json" } }
           );

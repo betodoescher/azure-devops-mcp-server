@@ -128,8 +128,6 @@ export function registerTools(server: McpServer): void {
     }
   );
 
-  // ── (removed duplicate create_test_suite and add_test_cases_to_suite — correct versions are below) ──
-
   // ── Test Cases (within a suite) ─────────────────────────────────────
 
   server.tool(
@@ -361,6 +359,83 @@ export function registerTools(server: McpServer): void {
           { params: { "api-version": "7.0" } }
         );
         return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
+      } catch (err) {
+        return errorResponse(err);
+      }
+    }
+  );
+
+  // ── Reset Test Points (set outcome to Active) ─────────────────────────
+
+  server.tool(
+    "reset_test_points",
+    "Reset test points to active state (clear execution outcome). Accepts specific point IDs or resets all points in the suite when no IDs are provided.",
+    {
+      project: z.string().describe("Project name or ID"),
+      planId: z.number().int().positive().describe("Test plan ID"),
+      suiteId: z.number().int().positive().describe("Test suite ID"),
+      pointIds: z
+        .array(z.number().int().positive())
+        .optional()
+        .describe(
+          "Array of test point IDs to reset. If omitted, all test points in the suite will be reset."
+        ),
+    },
+    async ({ project, planId, suiteId, pointIds }) => {
+      try {
+        let idsToReset: number[];
+
+        if (pointIds && pointIds.length > 0) {
+          idsToReset = pointIds;
+        } else {
+          // Fetch all test points in the suite to reset them all
+          const listRes = await azureClient.get<ApiListResponse<TestPoint>>(
+            `/${enc(project)}/_apis/testplan/plans/${planId}/suites/${suiteId}/testpoint`
+          );
+          idsToReset = listRes.data.value.map((tp) => tp.id);
+        }
+
+        if (idsToReset.length === 0) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  message: "No test points found in this suite.",
+                  resetCount: 0,
+                }),
+              },
+            ],
+          };
+        }
+
+        const body = idsToReset.map((id) => ({ id, isActive: true }));
+
+        const res = await azureClient.patch(
+          `/${enc(project)}/_apis/testplan/Plans/${planId}/Suites/${suiteId}/TestPoint`,
+          body,
+          {
+            params: {
+              "api-version": "7.1-preview.2",
+              includePointDetails: "true",
+              returnIdentityRef: "true",
+            },
+          }
+        );
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                message: `Successfully reset ${idsToReset.length} test point(s) to active.`,
+                resetCount: idsToReset.length,
+                pointIds: idsToReset,
+                response: res.data,
+              }),
+            },
+          ],
+        };
       } catch (err) {
         return errorResponse(err);
       }
