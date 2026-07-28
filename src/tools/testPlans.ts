@@ -128,55 +128,7 @@ export function registerTools(server: McpServer): void {
     }
   );
 
-  // ── Create Test Suite ─────────────────────────────────────────────────
-
-  server.tool(
-    "create_test_suite",
-    "Create a static test suite under a parent suite in a test plan.",
-    {
-      project: z.string().describe("Project name or ID"),
-      planId: z.number().describe("Test plan ID"),
-      parentSuiteId: z.number().describe("Parent suite ID to create the new suite under"),
-      name: z.string().describe("Name of the new test suite"),
-    },
-    async ({ project, planId, parentSuiteId, name }) => {
-      try {
-        const res = await azureClient.post(
-          `/${enc(project)}/_apis/testplan/Plans/${planId}/Suites`,
-          { suiteType: "staticTestSuite", name, parentSuite: { id: parentSuiteId } },
-          { params: { "api-version": "7.1-preview.1" } }
-        );
-        return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
-      } catch (err) {
-        return errorResponse(err);
-      }
-    }
-  );
-
-  // ── Add Test Cases to Suite ─────────────────────────────────────────
-
-  server.tool(
-    "add_test_cases_to_suite",
-    "Add existing test cases to a test suite.",
-    {
-      project: z.string().describe("Project name or ID"),
-      planId: z.number().describe("Test plan ID"),
-      suiteId: z.number().describe("Suite ID to add test cases to"),
-      testCaseIds: z.array(z.number()).describe("Array of test case work item IDs to add"),
-    },
-    async ({ project, planId, suiteId, testCaseIds }) => {
-      try {
-        const body = testCaseIds.map((id) => ({ workItem: { id } }));
-        const res = await azureClient.post(
-          `/${enc(project)}/_apis/testplan/Plans/${planId}/Suites/${suiteId}/TestCase`,
-          body
-        );
-        return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
-      } catch (err) {
-        return errorResponse(err);
-      }
-    }
-  );
+  // ── (removed duplicate create_test_suite and add_test_cases_to_suite — correct versions are below) ──
 
   // ── Test Cases (within a suite) ─────────────────────────────────────
 
@@ -401,14 +353,12 @@ export function registerTools(server: McpServer): void {
     },
     async ({ project, planId, suiteId, testCaseIds }) => {
       try {
-        const body = testCaseIds.map((id) => ({
-          workItem: { id },
-        }));
-        // Test Plan Suite TestCase endpoint requires api-version 7.1-preview.1 (preview API)
+        // Use the legacy test API (/_apis/test/) which accepts IDs in the URL path
+        const ids = testCaseIds.join(",");
         const res = await azureClient.post(
-          `/${enc(project)}/_apis/testplan/plans/${planId}/suites/${suiteId}/testcase`,
-          body,
-          { params: { "api-version": "7.1-preview.1" } }
+          `/${enc(project)}/_apis/test/Plans/${planId}/suites/${suiteId}/testcases/${ids}`,
+          undefined,
+          { params: { "api-version": "7.0" } }
         );
         return { content: [{ type: "text" as const, text: JSON.stringify(res.data) }] };
       } catch (err) {
